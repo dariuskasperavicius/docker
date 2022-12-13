@@ -1,0 +1,86 @@
+version: '3'
+
+networks:
+  kilo-academy-ms:
+
+services:
+  nginx:
+    image: nginx:stable-alpine
+    container_name: academy-nginx
+    ports:
+      - "8086:80"
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:delegated
+      - ./:/srv/test.com:delegated
+    environment:
+      XDEBUG_CONFIG: "remote_port=9003 remote_enable=1"
+    depends_on:
+      - php
+      - mysql
+    networks:
+      - kilo-academy-ms
+
+  mysql:
+    image: mysql:5.7.29
+    container_name: academy-mysql
+    restart: unless-stopped
+    tty: true
+    ports:
+      - 3306:3306
+    environment:
+      MYSQL_DATABASE: academy
+      MYSQL_USER: symfony
+      MYSQL_PASSWORD: symfony
+      MYSQL_ROOT_PASSWORD: root
+      SERVICE_TAGS: dev
+      SERVICE_NAME: mysql
+    networks:
+      - kilo-academy-ms
+    volumes:
+      - ./docker/mysql/data:/var/lib/mysql:delegated
+
+  php:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile
+    container_name: academy-php
+    depends_on:
+      - redis
+    volumes:
+      - .:/srv/test.com:delegated
+      - ./docker/php/conf.d/xdebug.ini:/usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini
+    expose:
+      - "9000"
+      - "9001"
+      - "9003"
+    networks:
+      - kilo-academy-ms
+
+  redis:
+    container_name: academy-redis
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - kilo-academy-ms
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: academy-phpmyadmin
+    links:
+      - mysql
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: symfony
+      PMA_PASSWORD: symfony
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: symfony
+      MYSQL_PASSWORD: symfony
+    ports:
+      - '8088:80'
+    volumes:
+      - ./docker/phpmyadmin/sessions:/sessions:delegated
+      - ./docker/phpmyadmin/php.ini:/usr/local/etc/php/php.ini
+    networks:
+      - kilo-academy-ms
